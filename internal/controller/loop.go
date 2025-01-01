@@ -37,6 +37,20 @@ func (c *loopController) UpdateSecretList(ctx context.Context) {
 	}()
 
 	secretList := c.p.Kr.GetSecretList(ctx)
+	for _, secret := range secretList.Items {
+		c.p.Kr.CompareSecret(ctx, &secret)
+	}
+}
+
+func (c *loopController) CreateSecretList(ctx context.Context) {
+	zap.S().Infof("CreateSecretList start")
+	defer func() {
+		if err := recover(); err != nil {
+			zap.S().Error(err)
+		}
+		zap.S().Infof("%s UpdateSecretList finish", time.Now())
+	}()
+	secretList := c.p.Kr.GetSecretList(ctx)
 	secretMap := c.p.Vault.GetSecretMap()
 	for _, secret := range secretList.Items {
 		if _, ok := secretMap[secret.Namespace+"/"+secret.Name]; ok {
@@ -47,15 +61,12 @@ func (c *loopController) UpdateSecretList(ctx context.Context) {
 		zap.S().Infof("%s(%s) create empty secret", newSecret.Name, newSecret.Namespace)
 		c.p.Kr.CreateEmptySecret(ctx, newSecret.Namespace, newSecret.Name)
 	}
-	for _, secret := range secretList.Items {
-		c.p.Kr.CompareSecret(ctx, &secret)
-	}
-
 }
 
 func (c *loopController) Start(ctx context.Context) {
 	go func() {
 		zap.S().Info("LoopController start")
+		c.CreateSecretList(ctx)
 		ticker := time.NewTicker(time.Second * time.Duration(c.p.Cfg.Interval))
 		for {
 			select {
@@ -64,6 +75,7 @@ func (c *loopController) Start(ctx context.Context) {
 				return
 			case _ = <-ticker.C:
 				c.UpdateSecretList(ctx)
+				c.CreateSecretList(ctx)
 			}
 		}
 	}()

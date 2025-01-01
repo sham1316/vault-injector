@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
@@ -87,12 +88,12 @@ func (kr *kubeRepo) CompareSecret(ctx context.Context, secret *v1.Secret) {
 		zap.S().Infof("%s(%s) no in secretMap - delete", secret.Namespace, secret.Name)
 		kr.DeleteSecret(ctx, secret.Namespace, secret.Name)
 	}
-	zap.S().Infof("%s(%s) check for update", secret.Namespace, secret.Name)
+	info := fmt.Sprintf("%s(%s) check for update", secret.Namespace, secret.Name)
 	if reflect.DeepEqual(secret.Data, data) {
-		zap.S().Infof("equals")
+		zap.S().Infof("%s - equals", info)
 	} else {
 		secret.Data = data
-		zap.S().Infof("not equals")
+		zap.S().Infof("%s - not equals", info)
 		kr.UpdateSecret(ctx, secret)
 	}
 }

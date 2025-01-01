@@ -1,0 +1,6 @@
+.idea
+*.pem
+.kubeconfig.yaml
+.config.yaml
+.token
+.map.yaml

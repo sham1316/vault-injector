@@ -1,0 +1,6 @@
+dev/vault-secret:
+  - user:projects/dev/mysql:db_username
+  - pass:projects/dev/mysql:db_password
+prod/vault-secret:
+  - user:projects/prod/mysql:db_username
+  - pass:projects/prod/mysql:db_password

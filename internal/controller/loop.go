@@ -44,7 +44,7 @@ func (c *loopController) UpdateSecretList(ctx context.Context) {
 		}
 	}
 	for _, newSecret := range secretMap {
-		zap.S().Info("%s(%s) create empty secret", newSecret.Name, newSecret.Namespace)
+		zap.S().Infof("%s(%s) create empty secret", newSecret.Name, newSecret.Namespace)
 		c.p.Kr.CreateEmptySecret(ctx, newSecret.Namespace, newSecret.Name)
 	}
 	for _, secret := range secretList.Items {
@@ -56,7 +56,6 @@ func (c *loopController) UpdateSecretList(ctx context.Context) {
 func (c *loopController) Start(ctx context.Context) {
 	go func() {
 		zap.S().Info("LoopController start")
-		c.UpdateSecretList(ctx)
 		ticker := time.NewTicker(time.Second * time.Duration(c.p.Cfg.Interval))
 		for {
 			select {

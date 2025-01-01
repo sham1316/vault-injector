@@ -41,7 +41,7 @@ type Config struct {
 	InCluster   bool   `default:"true" env:"IN_CLUSTER"`
 	Kubeconfig  string `default:"" env:"KUBECONFIG"`
 	TokenPath   string `default:"/var/run/secrets/kubernetes.io/serviceaccount/token" env:"TOKEN_PATH"`
-	VaultAddr   string `default:"http://vault-active.vault.svc.cluster.local" env:"VAULT_ADDR"`
+	VaultAddr   string `default:"https://vault-active.vault.svc.cluster.local:8200" env:"VAULT_ADDR"`
 	VaultRole   string `default:"vault-secret-syncer" env:"VAULT_ROLE"`
 	SecretLabel string `default:"vault-injector" env:"SECRET_LABEL"`
 	SecretMap   string `default:"map.yaml" env:"SECRET_MAP"`

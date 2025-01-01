@@ -66,11 +66,17 @@ func (v *vaultService) GetData(ctx context.Context, namespace, name string) map[
 }
 
 func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key string) []byte {
+	defer func() {
+		if err := recover(); err != nil {
+			zap.S().Error(err)
+		}
+	}()
 	secretName := ctx.Value("secret").(string)
 	secret, err := v.client.KVv2(mount).Get(ctx, path)
 	zap.S().Debugf("%s getKV %s/%s:%s", secretName, mount, path, key)
 	if err != nil {
 		zap.S().Errorf("unable to read secret: %v", err)
+		return nil
 	}
 	s := secret.Data[key]
 	return []byte(fmt.Sprintf("%v", s))

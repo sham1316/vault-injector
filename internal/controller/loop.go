@@ -24,6 +24,7 @@ type loopControllerParams struct {
 
 type LoopController interface {
 	UpdateSecretList(ctx context.Context)
+	CreateSecretList(ctx context.Context)
 	Start(ctx context.Context)
 }
 

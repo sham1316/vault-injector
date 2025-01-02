@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/kubernetes"
@@ -15,7 +16,7 @@ import (
 
 type Service interface {
 	IsNeedSecret(namespaceAndName string) bool
-	GetData(ctx context.Context, namespace, name string) map[string][]byte
+	GetData(ctx context.Context, namespace, name string) (map[string][]byte, error)
 	GetSecretMap() SecretMap
 	Start(ctx context.Context)
 }
@@ -44,27 +45,35 @@ func (v *vaultService) GetSecretMap() SecretMap {
 	defer v.Unlock()
 	return maps.Clone(v.secretMap)
 }
-func (v *vaultService) GetData(ctx context.Context, namespace, name string) map[string][]byte {
+func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
 	secret, ok := v.secretMap[namespace+"/"+name]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	data := make(map[string][]byte)
-	for _, path := range secret.ValuePath {
-		_secretPath := strings.SplitN(path, ":", 3)
+	errFlag := false
+	for _, vPath := range secret.ValuePath {
+		_secretPath := strings.SplitN(vPath, ":", 3)
 		_path := strings.SplitN(_secretPath[1], "/", 2)
 		key := _secretPath[0]
 		mount := _path[0]
 		path := _path[1]
 		vaultKey := _secretPath[2]
 		ctx = context.WithValue(ctx, "secret", name+"("+namespace+")")
-		secretData := v.GetVaultSecret(ctx, mount, path, vaultKey)
+		secretData, err := v.GetVaultSecret(ctx, mount, path, vaultKey)
+		if err != nil {
+			data[key] = []byte{}
+			errFlag = true
+		}
 		data[key] = secretData
 	}
-	return data
+	if errFlag {
+		return data, errors.New("get secret error")
+	}
+	return data, nil
 }
 
-func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key string) []byte {
+func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key string) ([]byte, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			zap.S().Error(err)
@@ -75,10 +84,10 @@ func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key stri
 	zap.S().Debugf("%s getKV %s/%s:%s", secretName, mount, path, key)
 	if err != nil {
 		zap.S().Errorf("unable to read secret: %v", err)
-		return nil
+		return nil, err
 	}
 	s := secret.Data[key]
-	return []byte(fmt.Sprintf("%v", s))
+	return []byte(fmt.Sprintf("%v", s)), nil
 }
 
 func vaultLogin(ctx context.Context, cfg *config.Config) *vault.Client {
@@ -116,7 +125,7 @@ func vaultLogin(ctx context.Context, cfg *config.Config) *vault.Client {
 func (v *vaultService) Start(ctx context.Context) {
 	v.client = vaultLogin(ctx, v.cfg)
 	go func() {
-		zap.S().Info("vault start")
+		zap.S().Info("vault started")
 		ticker := time.NewTicker(time.Second*time.Duration(v.cfg.Interval) - 10*time.Second)
 		for {
 			select {

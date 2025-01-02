@@ -49,7 +49,7 @@ func (c *loopController) CreateSecretList(ctx context.Context) {
 		if err := recover(); err != nil {
 			zap.S().Error(err)
 		}
-		zap.S().Infof("%s UpdateSecretList finish", time.Now())
+		zap.S().Infof("%s CreateSecretList finish", time.Now())
 	}()
 	secretList := c.p.Kr.GetSecretList(ctx)
 	secretMap := c.p.Vault.GetSecretMap()

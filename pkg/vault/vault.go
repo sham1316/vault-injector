@@ -17,6 +17,7 @@ type Service interface {
 	IsNeedSecret(namespaceAndName string) bool
 	GetData(ctx context.Context, namespace, name string) map[string][]byte
 	GetSecretMap() SecretMap
+	Start(ctx context.Context)
 }
 
 type vaultService struct {
@@ -27,9 +28,7 @@ type vaultService struct {
 }
 
 func NewVaultService(cfg *config.Config) Service {
-	client := vaultLogin(cfg)
 	return &vaultService{
-		client:    client,
 		cfg:       cfg,
 		secretMap: ParseMap(cfg.SecretMap),
 	}
@@ -82,11 +81,11 @@ func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key stri
 	return []byte(fmt.Sprintf("%v", s))
 }
 
-func vaultLogin(cfg *config.Config) *vault.Client {
-	config := vault.DefaultConfig()
-	config.Address = cfg.VaultAddr
-	config.Timeout = 60 * time.Second
-	client, err := vault.NewClient(config)
+func vaultLogin(ctx context.Context, cfg *config.Config) *vault.Client {
+	vaultConfig := vault.DefaultConfig()
+	vaultConfig.Address = cfg.VaultAddr
+	vaultConfig.Timeout = 60 * time.Second
+	client, err := vault.NewClient(vaultConfig)
 	if err != nil {
 		zap.S().Fatalf("can`t create vault client: %v", err)
 
@@ -101,7 +100,7 @@ func vaultLogin(cfg *config.Config) *vault.Client {
 		return nil
 	}
 
-	authInfo, err := client.Auth().Login(context.TODO(), k8sAuth)
+	authInfo, err := client.Auth().Login(ctx, k8sAuth)
 	if err != nil {
 		zap.S().Fatalf("una111ble to log in with Kubernetes auth: %v", err)
 		return nil
@@ -110,5 +109,23 @@ func vaultLogin(cfg *config.Config) *vault.Client {
 		zap.S().Fatalf("no auth info was returned after login")
 		return nil
 	}
+	zap.S().Infof("vault login success. duration:	 %d", authInfo.LeaseDuration)
 	return client
+}
+
+func (v *vaultService) Start(ctx context.Context) {
+	v.client = vaultLogin(ctx, v.cfg)
+	go func() {
+		zap.S().Info("vault start")
+		ticker := time.NewTicker(time.Second*time.Duration(v.cfg.Interval) - 10*time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				zap.S().Info("finish main context")
+				return
+			case _ = <-ticker.C:
+				v.client = vaultLogin(ctx, v.cfg)
+			}
+		}
+	}()
 }

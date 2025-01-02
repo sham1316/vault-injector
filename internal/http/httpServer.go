@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"fmt"
 	"github.com/gorilla/mux"
 	"go.uber.org/dig"
@@ -17,7 +16,6 @@ type WebServer interface {
 
 type simpleServer struct {
 	server *http.Server
-	ctx    context.Context
 }
 
 type ServerParams struct {

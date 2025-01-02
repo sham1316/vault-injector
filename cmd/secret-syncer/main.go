@@ -36,6 +36,12 @@ func main() {
 
 	zap.S().Infof("vault-secret-syncer starting. Version: %s. (BuiltTime: %s)\n", version, buildTime)
 
+	if err := container.Invoke(func(vault vault.Service) {
+		vault.Start(ctx)
+	}); err != nil {
+		zap.S().Fatal(err)
+	}
+
 	if err := container.Invoke(func(webServer http.WebServer) {
 		webServer.Start()
 	}); err != nil {
@@ -60,5 +66,4 @@ func main() {
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	sigName := <-signals
 	zap.S().Infof("Received SIGNAL - %s. Terminating...", sigName)
-
 }

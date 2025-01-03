@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 	"vault-injector/config"
+	telegram "vault-injector/pkg"
 )
 
 type Service interface {
@@ -22,6 +23,7 @@ type Service interface {
 }
 
 type vaultService struct {
+	telegam      *telegram.Telegram
 	secretMap    SecretMap
 	cfg          *config.Config
 	client       *vault.Client
@@ -29,9 +31,10 @@ type vaultService struct {
 	sync.Mutex
 }
 
-func NewVaultService(cfg *config.Config) Service {
+func NewVaultService(cfg *config.Config, telegram *telegram.Telegram) Service {
 	return &vaultService{
 		cfg:       cfg,
+		telegam:   telegram,
 		secretMap: ParseMap(cfg.SecretMap),
 	}
 }
@@ -84,7 +87,9 @@ func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key stri
 	secret, err := v.client.KVv2(mount).Get(ctx, path)
 	zap.S().Debugf("%s getKV %s/%s:%s", secretName, mount, path, key)
 	if err != nil {
-		zap.S().Errorf("unable to read secret: %v", err)
+		info := fmt.Sprintf("unable to read secret: %v", err)
+		zap.S().Error(info)
+		v.telegam.SendMessage(info)
 		return nil, err
 	}
 	s := secret.Data[key]

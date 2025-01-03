@@ -12,6 +12,7 @@ import (
 	"vault-injector/internal/controller"
 	"vault-injector/internal/http"
 	"vault-injector/internal/k8s"
+	telegram "vault-injector/pkg"
 	"vault-injector/pkg/vault"
 )
 
@@ -21,12 +22,11 @@ var (
 )
 
 func main() {
-	//cfg := config.GetCfg()
 	ctx, cancelFunction := context.WithCancel(context.Background())
-	//telega := telegram.NewTelegram(cfg)
 
 	container := dig.New()
 	container.Provide(config.GetCfg)                 //nolint:errcheck
+	container.Provide(telegram.NewTelegram)          //nolint:errcheck
 	container.Provide(k8s.NewKubeRepo)               //nolint:errcheck
 	container.Provide(k8s.NewKubeService)            //nolint:errcheck
 	container.Provide(http.NewWebServer)             //nolint:errcheck

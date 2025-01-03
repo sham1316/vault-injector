@@ -17,13 +17,13 @@ type Message struct {
 
 type Telegram struct {
 	ChatID int64 `json:"chat_id"`
-	token  config.Password
+	Token  config.Password
 }
 
 func NewTelegram(config *config.Config) *Telegram {
 	return &Telegram{
 		ChatID: config.Telegram.Channel,
-		token:  config.Telegram.Token,
+		Token:  config.Telegram.Token,
 	}
 }
 func (t *Telegram) SendMessage(str string) error {
@@ -36,7 +36,7 @@ func (t *Telegram) SendMessage(str string) error {
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", t.token)
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", t.Token)
 	response, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return err

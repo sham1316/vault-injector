@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go.uber.org/dig"
 	"go.uber.org/zap"
 	"os"
@@ -34,8 +35,6 @@ func main() {
 	container.Provide(controller.NewWatchController) //nolint:errcheck
 	container.Provide(vault.NewVaultService)         //nolint:errcheck
 
-	zap.S().Infof("vault-secret-syncer starting. Version: %s. (BuiltTime: %s)\n", version, buildTime)
-
 	if err := container.Invoke(func(vault vault.Service) {
 		vault.Start(ctx)
 	}); err != nil {
@@ -44,6 +43,14 @@ func main() {
 
 	if err := container.Invoke(func(webServer http.WebServer) {
 		webServer.Start()
+	}); err != nil {
+		zap.S().Fatal(err)
+	}
+
+	info := fmt.Sprintf("vault-secret-syncer starting. Version: %s. (BuiltTime: %s)\n", version, buildTime)
+	zap.S().Info(info)
+	if err := container.Invoke(func(telegram *telegram.Telegram) {
+		telegram.SendMessage(info)
 	}); err != nil {
 		zap.S().Fatal(err)
 	}

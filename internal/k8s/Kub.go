@@ -85,20 +85,20 @@ func (kr *kubeRepo) NewSecret(namespace, name string) *v1.Secret {
 func (kr *kubeRepo) CompareSecret(ctx context.Context, secret *v1.Secret) {
 	data, err := kr.vault.GetData(ctx, secret.Namespace, secret.Name)
 	if data == nil {
-		zap.S().Infof("%s(%s) no in secretMap - delete", secret.Namespace, secret.Name)
+		zap.S().Infof("%s(%s) no in secretMap - DELETE", secret.Namespace, secret.Name)
 		kr.DeleteSecret(ctx, secret.Namespace, secret.Name)
 		return
 	}
 	if err != nil {
-		zap.S().Infof("%s(%s) GetSecret error - skip", secret.Namespace, secret.Name)
+		zap.S().Infof("%s(%s) GetSecret error - SKIP", secret.Namespace, secret.Name)
 		return
 	}
 	info := fmt.Sprintf("%s(%s) check for update", secret.Namespace, secret.Name)
 	if reflect.DeepEqual(secret.Data, data) {
-		zap.S().Infof("%s - equals", info)
+		zap.S().Infof("%s - EQUALS", info)
 	} else {
 		secret.Data = data
-		zap.S().Infof("%s - not equals", info)
+		zap.S().Infof("%s - NOT EQUALS", info)
 		kr.UpdateSecret(ctx, secret)
 	}
 }

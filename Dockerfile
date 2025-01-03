@@ -1,4 +1,5 @@
 FROM golang:1.23.0 AS builder
+ARG VERSION="unknow"
 
 WORKDIR /app/
 
@@ -11,7 +12,7 @@ COPY config/ config/
 COPY internal/ internal/
 COPY pkg/ pkg/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o vault-secret-syncer cmd/secret-syncer/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags "-X main.version=$VERSION -X main.buildTime=$(date +%Y-%m-%d-%H:%M:%S)" -o vault-secret-syncer cmd/secret-syncer/main.go
 
 FROM alpine:3.20.2
 WORKDIR /app

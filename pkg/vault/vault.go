@@ -8,6 +8,7 @@ import (
 	auth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
 	"maps"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -129,6 +130,7 @@ func vaultLogin(ctx context.Context, cfg *config.Config) (*vault.Client, *vault.
 
 func (v *vaultService) Start(ctx context.Context) {
 	v.client, v.clientSecret = vaultLogin(ctx, v.cfg)
+	v.initTelegram(ctx)
 	zap.S().Infof("vault login success. duration: %d", v.clientSecret.Auth.LeaseDuration)
 	go func() {
 		zap.S().Info("vault started")
@@ -143,4 +145,24 @@ func (v *vaultService) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (v *vaultService) initTelegram(ctx context.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			zap.S().Errorf("Init telegram failed: %v", err)
+		}
+	}()
+
+	secret, err := v.client.KVv2("projects").Get(ctx, "share/telegram")
+	zap.S().Debugf("%s getKV %s/%s", "telegram", "projects", "share/telegram")
+	if err != nil {
+		info := fmt.Sprintf("Init telegram failed: %v", err)
+		zap.S().Error(info)
+		return
+	}
+	ChatID, _ := strconv.ParseInt(secret.Data["channel"].(string), 10, 0)
+	v.telegam.ChatID = ChatID
+	v.telegam.Token = config.Password(secret.Data["token"].(string))
+	zap.S().Info("Telegram initialized")
 }

@@ -22,9 +22,10 @@ type Service interface {
 }
 
 type vaultService struct {
-	secretMap SecretMap
-	cfg       *config.Config
-	client    *vault.Client
+	secretMap    SecretMap
+	cfg          *config.Config
+	client       *vault.Client
+	clientSecret *vault.Secret
 	sync.Mutex
 }
 
@@ -90,7 +91,7 @@ func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key stri
 	return []byte(fmt.Sprintf("%v", s)), nil
 }
 
-func vaultLogin(ctx context.Context, cfg *config.Config) *vault.Client {
+func vaultLogin(ctx context.Context, cfg *config.Config) (*vault.Client, *vault.Secret) {
 	vaultConfig := vault.DefaultConfig()
 	vaultConfig.Address = cfg.VaultAddr
 	vaultConfig.Timeout = 60 * time.Second
@@ -106,34 +107,34 @@ func vaultLogin(ctx context.Context, cfg *config.Config) *vault.Client {
 
 	if err != nil {
 		zap.S().Fatalf("unable to initialize Kubernetes auth method: %v", err)
-		return nil
+		return nil, nil
 	}
 
 	authInfo, err := client.Auth().Login(ctx, k8sAuth)
 	if err != nil {
 		zap.S().Fatalf("una111ble to log in with Kubernetes auth: %v", err)
-		return nil
+		return nil, nil
 	}
 	if authInfo == nil {
 		zap.S().Fatalf("no auth info was returned after login")
-		return nil
+		return nil, nil
 	}
-	zap.S().Infof("vault login success. duration:	 %d", authInfo.LeaseDuration)
-	return client
+	return client, authInfo
 }
 
 func (v *vaultService) Start(ctx context.Context) {
-	v.client = vaultLogin(ctx, v.cfg)
+	v.client, v.clientSecret = vaultLogin(ctx, v.cfg)
+	zap.S().Infof("vault login success. duration: %d", v.clientSecret.Auth.LeaseDuration)
 	go func() {
 		zap.S().Info("vault started")
-		ticker := time.NewTicker(time.Second*time.Duration(v.cfg.Interval) - 10*time.Second)
+		ticker := time.NewTicker(time.Second*time.Duration(v.clientSecret.Auth.LeaseDuration) - 10*time.Second)
 		for {
 			select {
 			case <-ctx.Done():
 				zap.S().Info("finish main context")
 				return
 			case _ = <-ticker.C:
-				v.client = vaultLogin(ctx, v.cfg)
+				v.client, v.clientSecret = vaultLogin(ctx, v.cfg)
 			}
 		}
 	}()

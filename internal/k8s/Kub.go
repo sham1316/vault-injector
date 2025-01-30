@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"reflect"
+	"strings"
 	"vault-injector/config"
 	"vault-injector/pkg/vault"
 )
@@ -15,6 +16,7 @@ import (
 type KubeRepo interface {
 	DeleteSecret(ctx context.Context, namespace, name string)
 	CreateEmptySecret(ctx context.Context, namespace, name string)
+	CreateDockerSecret(ctx context.Context, namespace, name string)
 	UpdateSecret(ctx context.Context, secret *v1.Secret)
 	GetSecretList(ctx context.Context) *v1.SecretList
 	WatchSecretList(ctx context.Context) watch.Interface
@@ -67,7 +69,7 @@ func (kr *kubeRepo) UpdateSecret(ctx context.Context, secret *v1.Secret) {
 	}
 }
 
-func (kr *kubeRepo) NewSecret(namespace, name string) *v1.Secret {
+func (kr *kubeRepo) _newSecret(namespace, name string, _type v1.SecretType) *v1.Secret {
 	labels := map[string]string{
 		kr.cfg.SecretLabel + "/sync": "true",
 	}
@@ -78,12 +80,29 @@ func (kr *kubeRepo) NewSecret(namespace, name string) *v1.Secret {
 			Namespace: namespace,
 			Labels:    labels,
 		},
-		Type: v1.SecretTypeOpaque,
+		Type: _type,
 	}
 }
 
+func (kr *kubeRepo) NewSecret(namespace, name string) *v1.Secret {
+	return kr._newSecret(namespace, name, v1.SecretTypeOpaque)
+}
+
+func (kr *kubeRepo) NewDockerSecret(namespace, name string, data map[string][]byte) *v1.Secret {
+	secret := kr._newSecret(namespace, name, v1.SecretTypeDockercfg)
+	secret.Data = data
+	return secret
+}
+
 func (kr *kubeRepo) CompareSecret(ctx context.Context, secret *v1.Secret) {
-	data, err := kr.vault.GetData(ctx, secret.Namespace, secret.Name)
+	var data map[string][]byte
+	var err error
+	if strings.Contains(secret.Name, "dockerconfigjson") {
+		data, err = kr.vault.GetDockerData(ctx, secret.Namespace, secret.Name)
+	} else {
+		data, err = kr.vault.GetData(ctx, secret.Namespace, secret.Name)
+	}
+
 	if data == nil {
 		zap.S().Infof("%s(%s) no in secretMap - DELETE", secret.Namespace, secret.Name)
 		kr.DeleteSecret(ctx, secret.Namespace, secret.Name)
@@ -109,5 +128,13 @@ func (kr *kubeRepo) CreateEmptySecret(ctx context.Context, namespace, name strin
 	if err != nil {
 		zap.S().Errorf("error CreateEmptySecret: %v", err)
 	}
+}
 
+func (kr *kubeRepo) CreateDockerSecret(ctx context.Context, namespace, name string) {
+	data, err := kr.vault.GetDockerData(ctx, namespace, name)
+	secret := kr.NewDockerSecret(namespace, name, data)
+	err = kr.ks.CreateSecret(ctx, secret)
+	if err != nil {
+		zap.S().Errorf("error CreateEmptyDockerSecret: %v", err)
+	}
 }

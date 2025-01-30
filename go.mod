@@ -3,6 +3,7 @@ module vault-injector
 go 1.23.0
 
 require (
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/vault/api v1.15.0
@@ -12,6 +13,7 @@ require (
 	go.uber.org/dig v1.18.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.30.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.0
 	k8s.io/apimachinery v0.32.0
 	k8s.io/client-go v0.32.0
@@ -64,7 +66,6 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect

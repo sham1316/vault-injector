@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	vault "github.com/hashicorp/vault/api"
@@ -16,15 +17,25 @@ import (
 	telegram "vault-injector/pkg"
 )
 
+type DockerRegistryConfig struct {
+	Auths map[string]DockerRegistryAuth `json:"auths"`
+}
+
+type DockerRegistryAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 type Service interface {
 	IsNeedSecret(namespaceAndName string) bool
 	GetData(ctx context.Context, namespace, name string) (map[string][]byte, error)
+	GetDockerData(ctx context.Context, namespace, name string) (map[string][]byte, error)
 	GetSecretMap() SecretMap
 	Start(ctx context.Context)
 }
 
 type vaultService struct {
-	telegam      *telegram.Telegram
+	telegram     *telegram.Telegram
 	secretMap    SecretMap
 	cfg          *config.Config
 	client       *vault.Client
@@ -35,7 +46,7 @@ type vaultService struct {
 func NewVaultService(cfg *config.Config, telegram *telegram.Telegram) Service {
 	return &vaultService{
 		cfg:       cfg,
-		telegam:   telegram,
+		telegram:  telegram,
 		secretMap: ParseMap(cfg.SecretMap),
 	}
 }
@@ -78,6 +89,48 @@ func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map
 	return data, nil
 }
 
+func (v *vaultService) GetDockerData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
+	secret, ok := v.secretMap[namespace+"/"+name]
+	if !ok {
+		return nil, nil
+	}
+	vPath := secret.ValuePath[0]
+	_secretPath := strings.SplitN(vPath, ":", 2)
+	_path := strings.SplitN(_secretPath[0], "/", 2)
+	mount := _path[0]
+	path := _path[1]
+	vaultKey := _secretPath[1]
+	ctx = context.WithValue(ctx, "secret", name+"("+namespace+")")
+	host, err := v.GetVaultSecret(ctx, mount, path, vaultKey+"/host")
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := v.GetVaultSecret(ctx, mount, path, vaultKey+"/username")
+	if err != nil {
+		return nil, err
+	}
+
+	pass, err := v.GetVaultSecret(ctx, mount, path, vaultKey+"/password")
+	if err != nil {
+		return nil, err
+	}
+
+	conf := DockerRegistryConfig{
+		Auths: map[string]DockerRegistryAuth{
+			string(host): {
+				Username: string(user),
+				Password: string(pass),
+			},
+		},
+	}
+	secretData, _ := json.Marshal(conf)
+	data := make(map[string][]byte)
+	data[".dockercfg"] = secretData
+
+	return data, nil
+}
+
 func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key string) ([]byte, error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -90,7 +143,7 @@ func (v *vaultService) GetVaultSecret(ctx context.Context, mount, path, key stri
 	if err != nil {
 		info := fmt.Sprintf("unable to read secret: %v", err)
 		zap.S().Error(info)
-		v.telegam.SendMessage(info)
+		v.telegram.SendMessage(info)
 		return nil, err
 	}
 	s := secret.Data[key]
@@ -162,7 +215,7 @@ func (v *vaultService) initTelegram(ctx context.Context) {
 		return
 	}
 	ChatID, _ := strconv.ParseInt(secret.Data["channel"].(string), 10, 0)
-	v.telegam.ChatID = ChatID
-	v.telegam.Token = config.Password(secret.Data["token"].(string))
+	v.telegram.ChatID = ChatID
+	v.telegram.Token = config.Password(secret.Data["token"].(string))
 	zap.S().Info("Telegram initialized")
 }

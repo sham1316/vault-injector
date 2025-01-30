@@ -4,6 +4,7 @@ import (
 	"context"
 	"go.uber.org/dig"
 	"go.uber.org/zap"
+	"strings"
 	"time"
 	"vault-injector/config"
 	"vault-injector/internal/k8s"
@@ -59,8 +60,13 @@ func (c *loopController) CreateSecretList(ctx context.Context) {
 		}
 	}
 	for _, newSecret := range secretMap {
-		zap.S().Infof("%s(%s) create empty secret", newSecret.Name, newSecret.Namespace)
-		c.p.Kr.CreateEmptySecret(ctx, newSecret.Namespace, newSecret.Name)
+		if strings.Contains(newSecret.Name, "dockerconfigjson") {
+			zap.S().Infof("%s(%s) create docker secret", newSecret.Name, newSecret.Namespace)
+			c.p.Kr.CreateDockerSecret(ctx, newSecret.Namespace, newSecret.Name)
+		} else {
+			zap.S().Infof("%s(%s) create empty secret", newSecret.Name, newSecret.Namespace)
+			c.p.Kr.CreateEmptySecret(ctx, newSecret.Namespace, newSecret.Name)
+		}
 	}
 }
 

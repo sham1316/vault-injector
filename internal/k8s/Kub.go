@@ -89,7 +89,7 @@ func (kr *kubeRepo) NewSecret(namespace, name string) *v1.Secret {
 }
 
 func (kr *kubeRepo) NewDockerSecret(namespace, name string, data map[string][]byte) *v1.Secret {
-	secret := kr._newSecret(namespace, name, v1.SecretTypeDockercfg)
+	secret := kr._newSecret(namespace, name, v1.SecretTypeDockerConfigJson)
 	secret.Data = data
 	return secret
 }

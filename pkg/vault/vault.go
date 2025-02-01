@@ -2,12 +2,13 @@ package vault
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
+	v1 "k8s.io/api/core/v1"
 	"maps"
 	"strconv"
 	"strings"
@@ -116,17 +117,12 @@ func (v *vaultService) GetDockerData(ctx context.Context, namespace, name string
 		return nil, err
 	}
 
-	conf := DockerRegistryConfig{
-		Auths: map[string]DockerRegistryAuth{
-			string(host): {
-				Username: string(user),
-				Password: string(pass),
-			},
-		},
-	}
-	secretData, _ := json.Marshal(conf)
+	user = append(user, byte(':'))
+	userPass := append(user, pass...)
+	encodedUserPass := base64.StdEncoding.EncodeToString(userPass)
+	s := fmt.Sprintf(`'{"auths": {"%v": {"auth": "%v"}}}`, host, encodedUserPass)
 	data := make(map[string][]byte)
-	data[".dockercfg"] = secretData
+	data[v1.DockerConfigJsonKey] = []byte(s)
 
 	return data, nil
 }

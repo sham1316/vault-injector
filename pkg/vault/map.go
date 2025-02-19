@@ -18,7 +18,7 @@ type Secret struct {
 type SecretMap map[string]Secret
 
 func ParseMap(file string) SecretMap {
-
+	zap.S().Debug(file)
 	yamlFile, err := os.ReadFile(file)
 	if err != nil {
 		zap.S().Errorf("yamlFile.Get err   #%v ", err)

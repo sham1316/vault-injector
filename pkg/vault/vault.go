@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
@@ -45,14 +46,24 @@ type vaultService struct {
 }
 
 func NewVaultService(cfg *config.Config, telegram *telegram.Telegram) Service {
-	return &vaultService{
-		cfg:       cfg,
-		telegram:  telegram,
-		secretMap: ParseMap(cfg.SecretMap),
+	vs := &vaultService{
+		cfg:      cfg,
+		telegram: telegram,
 	}
+	vs.setSecretMap()
+	go configWatcher(vs)
+	return vs
+}
+func (v *vaultService) setSecretMap() {
+	v.Lock()
+	defer v.Unlock()
+	v.secretMap = ParseMap(v.cfg.SecretMap)
+	return
 }
 
 func (v *vaultService) IsNeedSecret(namespaceAndName string) bool {
+	v.Lock()
+	defer v.Unlock()
 	_, ok := v.secretMap[namespaceAndName]
 	return ok
 }
@@ -63,6 +74,8 @@ func (v *vaultService) GetSecretMap() SecretMap {
 	return maps.Clone(v.secretMap)
 }
 func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
+	v.Lock()
+	defer v.Unlock()
 	secret, ok := v.secretMap[namespace+"/"+name]
 	if !ok {
 		return nil, nil
@@ -91,6 +104,8 @@ func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map
 }
 
 func (v *vaultService) GetDockerData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
+	v.Lock()
+	defer v.Unlock()
 	secret, ok := v.secretMap[namespace+"/"+name]
 	if !ok {
 		return nil, nil
@@ -215,4 +230,37 @@ func (v *vaultService) initTelegram(ctx context.Context) {
 	v.telegram.ChatID = ChatID
 	v.telegram.Token = config.Password(secret.Data["token"].(string))
 	zap.S().Info("Telegram initialized")
+}
+
+func configWatcher(v *vaultService) {
+	configFile := v.cfg.SecretMap
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		zap.S().Fatalf("watcher error: %v", err)
+	}
+	defer watcher.Close()
+	err = watcher.Add(configFile)
+	if err != nil {
+		zap.S().Fatalf("watcher error: %v", err)
+	}
+	for {
+		select {
+		case event := <-watcher.Events:
+			// k8s configmaps uses symlinks, we need this workaround.
+			// original configmap file is removed
+			if event.Op == fsnotify.Remove {
+				// remove the watcher since the file is removed
+				watcher.Remove(event.Name)
+				// add a new watcher pointing to the new symlink/file
+				watcher.Add(configFile)
+				v.setSecretMap()
+			}
+			// also allow normal files to be modified and reloaded.
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				v.setSecretMap()
+			}
+		case err := <-watcher.Errors:
+			zap.S().Fatalf("watcher error: %v", err)
+		}
+	}
 }

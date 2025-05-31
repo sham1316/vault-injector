@@ -26,14 +26,15 @@ func main() {
 	ctx, cancelFunction := context.WithCancel(context.Background())
 
 	container := dig.New()
-	container.Provide(config.GetCfg)                 //nolint:errcheck
-	container.Provide(telegram.NewTelegram)          //nolint:errcheck
-	container.Provide(k8s.NewKubeRepo)               //nolint:errcheck
-	container.Provide(k8s.NewKubeService)            //nolint:errcheck
-	container.Provide(http.NewWebServer)             //nolint:errcheck
-	container.Provide(controller.NewLoopController)  //nolint:errcheck
-	container.Provide(controller.NewWatchController) //nolint:errcheck
-	container.Provide(vault.NewVaultService)         //nolint:errcheck
+	container.Provide(config.GetCfg)                                                                   //nolint:errcheck
+	container.Provide(telegram.NewTelegram)                                                            //nolint:errcheck
+	container.Provide(k8s.NewKubeRepo)                                                                 //nolint:errcheck
+	container.Provide(k8s.NewKubeService)                                                              //nolint:errcheck
+	container.Provide(http.NewWebServer)                                                               //nolint:errcheck
+	container.Provide(controller.NewLoopController)                                                    //nolint:errcheck
+	container.Provide(controller.NewWatchController)                                                   //nolint:errcheck
+	container.Provide(vault.NewVaultService)                                                           //nolint:errcheck
+	container.Provide(func() chan config.UpdateInterface { return make(chan config.UpdateInterface) }) //nolint:errcheck
 
 	if err := container.Invoke(func(vault vault.Service) {
 		vault.Start(ctx)

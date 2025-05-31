@@ -42,14 +42,16 @@ type vaultService struct {
 	cfg          *config.Config
 	client       *vault.Client
 	clientSecret *vault.Secret
+	updateChan   chan config.UpdateInterface
 	sync.Mutex
 }
 
-func NewVaultService(cfg *config.Config, telegram *telegram.Telegram) Service {
+func NewVaultService(cfg *config.Config, telegram *telegram.Telegram, updateChan chan config.UpdateInterface) Service {
 	vs := &vaultService{
-		cfg:       cfg,
-		telegram:  telegram,
-		secretMap: ParseMap(cfg.SecretMap),
+		cfg:        cfg,
+		telegram:   telegram,
+		secretMap:  ParseMap(cfg.SecretMap),
+		updateChan: updateChan,
 	}
 	return vs
 }
@@ -58,6 +60,8 @@ func (v *vaultService) setSecretMap() {
 	v.Lock()
 	defer v.Unlock()
 	v.secretMap = ParseMap(v.cfg.SecretMap)
+	u := config.UpdateInterface(true)
+	v.updateChan <- u
 	return
 }
 
@@ -68,15 +72,21 @@ func (v *vaultService) IsNeedSecret(namespaceAndName string) bool {
 	return ok
 }
 
+func (v *vaultService) GetSecretCfg(namespace, name string) (Secret, bool) {
+	v.Lock()
+	defer v.Unlock()
+	secret, ok := v.secretMap[namespace+"/"+name]
+	return secret, ok
+}
+
 func (v *vaultService) GetSecretMap() SecretMap {
 	v.Lock()
 	defer v.Unlock()
 	return maps.Clone(v.secretMap)
 }
+
 func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
-	v.Lock()
-	defer v.Unlock()
-	secret, ok := v.secretMap[namespace+"/"+name]
+	secret, ok := v.GetSecretCfg(namespace, name)
 	if !ok {
 		return nil, nil
 	}
@@ -104,9 +114,7 @@ func (v *vaultService) GetData(ctx context.Context, namespace, name string) (map
 }
 
 func (v *vaultService) GetDockerData(ctx context.Context, namespace, name string) (map[string][]byte, error) {
-	v.Lock()
-	defer v.Unlock()
-	secret, ok := v.secretMap[namespace+"/"+name]
+	secret, ok := v.GetSecretCfg(namespace, name)
 	if !ok {
 		return nil, nil
 	}

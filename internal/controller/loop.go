@@ -18,9 +18,10 @@ type loopController struct {
 type loopControllerParams struct {
 	dig.In
 
-	Cfg   *config.Config
-	Kr    k8s.KubeRepo
-	Vault vault.Service
+	Cfg         *config.Config
+	Kr          k8s.KubeRepo
+	Vault       vault.Service
+	ForceUpdate chan config.UpdateInterface
 }
 
 type LoopController interface {
@@ -73,13 +74,13 @@ func (c *loopController) CreateSecretList(ctx context.Context) {
 func (c *loopController) Start(ctx context.Context) {
 	go func() {
 		zap.S().Info("LoopController start")
-		c.CreateSecretList(ctx)
 		ticker := time.NewTicker(time.Second * time.Duration(c.p.Cfg.Interval))
 		for {
 			select {
 			case <-ctx.Done():
 				zap.S().Info("finish main context")
 				return
+			case <-c.p.ForceUpdate:
 			case _ = <-ticker.C:
 				c.UpdateSecretList(ctx)
 				c.CreateSecretList(ctx)

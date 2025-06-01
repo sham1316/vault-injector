@@ -15,6 +15,8 @@ var config *Config
 var once sync.Once
 var configPath *string
 
+type UpdateInterface interface{}
+
 type Password string
 
 func (p Password) MarshalJSON() ([]byte, error) {
@@ -38,6 +40,7 @@ func (c certificate) MarshalJSON() ([]byte, error) {
 
 type Config struct {
 	LogLevel    string `default:"debug" env:"LOG_LEVEL"`
+	DryRun      bool   `default:"false" env:"DRY_RUN"`
 	InCluster   bool   `default:"true" env:"IN_CLUSTER"`
 	Kubeconfig  string `default:"" env:"KUBECONFIG"`
 	TokenPath   string `default:"/var/run/secrets/kubernetes.io/serviceaccount/token" env:"TOKEN_PATH"`

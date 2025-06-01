@@ -18,9 +18,10 @@ type loopController struct {
 type loopControllerParams struct {
 	dig.In
 
-	Cfg   *config.Config
-	Kr    k8s.KubeRepo
-	Vault vault.Service
+	Cfg         *config.Config
+	Kr          k8s.KubeRepo
+	Vault       vault.Service
+	ForceUpdate chan config.UpdateInterface
 }
 
 type LoopController interface {
@@ -80,7 +81,12 @@ func (c *loopController) Start(ctx context.Context) {
 			case <-ctx.Done():
 				zap.S().Info("finish main context")
 				return
-			case _ = <-ticker.C:
+			case <-c.p.ForceUpdate:
+				zap.S().Info("force update")
+				c.UpdateSecretList(ctx)
+				c.CreateSecretList(ctx)
+			case <-ticker.C:
+				zap.S().Info("tiker update")
 				c.UpdateSecretList(ctx)
 				c.CreateSecretList(ctx)
 			}

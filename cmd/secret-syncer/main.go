@@ -34,6 +34,9 @@ func main() {
 	container.Provide(controller.NewLoopController)  //nolint:errcheck
 	container.Provide(controller.NewWatchController) //nolint:errcheck
 	container.Provide(vault.NewVaultService)         //nolint:errcheck
+	container.Provide(func() chan config.UpdateInterface {
+		return make(chan config.UpdateInterface)
+	}) //nolint:errcheck
 
 	if err := container.Invoke(func(vault vault.Service) {
 		vault.Start(ctx)
